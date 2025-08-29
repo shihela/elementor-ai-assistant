@@ -54,6 +54,7 @@ final class Elementor_AI_Assistant
         add_action('elementor/widgets/register', [$this, 'register_widgets']);
         add_action('elementor/editor/after_enqueue_scripts', [$this, 'enqueue_editor_scripts']);
         add_action('wp_ajax_eai_generate_design', [$this, 'handle_ajax_generate_design']);
+        add_action('elementor/editor/after_enqueue_styles', [$this, 'enqueue_editor_styles']);
         
         // Hooks untuk halaman pengaturan
         add_action('admin_menu', [$this, 'create_admin_menu']);
@@ -78,6 +79,17 @@ final class Elementor_AI_Assistant
     {
         wp_enqueue_script('ai-assistant-editor-js', plugin_dir_url(__FILE__) . 'assets/js/editor.js', ['elementor-editor', 'jquery'], self::VERSION, true);
         wp_localize_script('ai-assistant-editor-js', 'eai_ajax_object', ['ajax_url' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('eai_ajax_nonce')]);
+    }
+
+    // Letakkan fungsi ini di dalam kelas
+    public function enqueue_editor_styles(): void
+    {
+        wp_enqueue_style(
+            'ai-assistant-editor-css',
+            plugin_dir_url(__FILE__) . 'assets/css/editor.css',
+            [], // Tidak ada dependensi
+            self::VERSION
+        );
     }
 
     public function create_admin_menu(): void
