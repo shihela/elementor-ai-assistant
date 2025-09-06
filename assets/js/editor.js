@@ -1,93 +1,82 @@
 /**
- * Script untuk menangani interaksi widget AI Assistant di dalam editor Elementor.
- * @since 2.5.1 (Final Listener Fix)
+ * Script untuk menangani interaksi widget AI Assistant.
+ * @since 3.2.1 (Final Modal Listener Fix)
  */
 (function ($) {
     'use strict';
 
     const aiAssistantEditor = {
-        /**
-         * Inisialisasi script utama.
-         */
+        conversationHistory: {}, 
+
         init: function () {
             if (typeof elementor === 'undefined') { return; }
-
-            // Listener untuk tombol Generate, ini selalu aman.
             elementor.channels.editor.on('eai_assistant:generate', this.handleGenerateClick);
-
-            // --- PERBAIKAN UTAMA: Memasang dan memasang ulang listener dengan cerdas ---
-            // Saat pratinjau pertama kali dimuat
-            elementor.on('preview:loaded', () => this.attachCopyListener());
-            // Saat terjadi perubahan besar pada editor yang mungkin me-reload iframe
-            elementor.channels.editor.on('change', () => this.attachCopyListener());
+            elementor.on('preview:loaded', () => this.attachIframeListeners());
         },
 
-        /**
-         * Memasang listener untuk tombol Salin Teks di dalam iframe pratinjau.
-         * Ini adalah fungsi kunci untuk mencegah listener ganda atau salah target.
-         */
-        attachCopyListener: function() {
+        attachIframeListeners: function() {
             const $previewIframe = $('#elementor-preview-iframe');
-            if ($previewIframe.length) {
-                const $iframeContents = $previewIframe.contents();
-                // Gunakan .off() dulu untuk menghapus listener lama sebelum memasang yang baru.
-                // Ini mencegah penumpukan event listener yang bisa menyebabkan masalah.
-                $iframeContents.off('click.aiAssistant').on('click.aiAssistant', '.eai-copy-button', this.handleCopyClick);
-            }
-        },
+            if (!$previewIframe.length) return;
 
-        /**
-         * Menangani event klik pada tombol "Generate Desain".
-         */
+            const $iframeBody = $previewIframe.contents().find('body');
+            $iframeBody.off('.aiAssistant');
+            $iframeBody.on('submit.aiAssistant', '.eai-follow-up-form', this.handleFollowUpSubmit);
+            $iframeBody.on('click.aiAssistant', '.eai-view-copy-button', this.openModal);
+        },
+        
         handleGenerateClick: function () {
             try {
-                const $textarea = $('.elementor-control-eai_prompt textarea');
-                if (!$textarea.length) { throw new Error('Could not find prompt textarea.'); }
-                const promptText = $textarea.val();
-
-                if (!aiAssistantEditor.isPromptValid(promptText)) {
-                    aiAssistantEditor.showNotification('error', 'Prompt cannot be empty!');
-                    return;
-                }
-                
                 const widgetModel = elementor.getPanelView().getCurrentPageView().model;
                 if (!widgetModel) { throw new Error('Could not get widget model.'); }
                 const widgetId = widgetModel.get('id');
-                const $previewIframe = $('#elementor-preview-iframe').contents();
-                const $widgetElement = $previewIframe.find(`[data-id="${widgetId}"]`);
+                const promptText = widgetModel.get('settings').get('eai_prompt');
 
-                if (!$widgetElement.length) { throw new Error('Could not find widget element in canvas.'); }
+                if (!aiAssistantEditor.isPromptValid(promptText)) {
+                    aiAssistantEditor.showNotification('error', 'Initial prompt cannot be empty!');
+                    return;
+                }
+                
+                aiAssistantEditor.conversationHistory[widgetId] = [{'role': 'user', 'parts': [{'text': promptText}]}];
+                const $widgetElement = aiAssistantEditor.getWidgetElement(widgetId);
+                if (!$widgetElement) { return; }
 
                 aiAssistantEditor.setLoadingState($widgetElement, true);
-                aiAssistantEditor.sendRequestToBackend(promptText, $widgetElement);
+                aiAssistantEditor.sendRequestToBackend(widgetId, $widgetElement);
             } catch (error) {
                 console.error("AI Assistant Error:", error);
                 aiAssistantEditor.showNotification('error', 'A critical JavaScript error occurred.');
             }
         },
 
-        // --- Sisa fungsi (handleCopyClick, sendRequestToBackend, dll.) tidak ada perubahan ---
-        handleCopyClick: function(event) {
-            const $button = $(event.currentTarget);
-            const $wrapper = $button.closest('.eai-response-wrapper');
-            const textToCopy = $wrapper.find('pre').text();
-            if (textToCopy && navigator.clipboard) {
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    const originalText = 'Salin Teks';
-                    $button.text('Tersalin!').addClass('copied');
-                    setTimeout(() => { $button.text(originalText).removeClass('copied'); }, 2000);
-                });
-            }
+        handleFollowUpSubmit: function(event) {
+            event.preventDefault();
+            const $form = $(event.currentTarget);
+            const $input = $form.find('.eai-follow-up-input');
+            const promptText = $input.val();
+            const widgetId = $form.data('widget-id');
+            const $widgetElement = aiAssistantEditor.getWidgetElement(widgetId);
+
+            if (!aiAssistantEditor.isPromptValid(promptText) || !$widgetElement) { return; }
+
+            aiAssistantEditor.conversationHistory[widgetId].push({'role': 'user', 'parts': [{'text': promptText}]});
+            $input.val('');
+            aiAssistantEditor.setLoadingState($widgetElement, true);
+            aiAssistantEditor.sendRequestToBackend(widgetId, $widgetElement);
         },
 
-        sendRequestToBackend: function (prompt, $widgetElement) {
+        sendRequestToBackend: function (widgetId, $widgetElement) {
             $.ajax({
                 url: eai_ajax_object.ajax_url,
                 type: 'POST',
-                data: { action: 'eai_generate_design', prompt: prompt, security: eai_ajax_object.nonce },
+                data: {
+                    action: 'eai_generate_design',
+                    conversation_history: JSON.stringify(aiAssistantEditor.conversationHistory[widgetId]),
+                    security: eai_ajax_object.nonce
+                },
                 success: function (response) {
                     if (response.success) {
-                        aiAssistantEditor.displayResult($widgetElement, response.data.message);
+                        aiAssistantEditor.conversationHistory[widgetId].push({'role': 'model', 'parts': [{'text': response.data.message}]});
+                        aiAssistantEditor.displayConversation(widgetId, $widgetElement);
                     } else {
                         aiAssistantEditor.displayError($widgetElement, response.data.message);
                     }
@@ -98,27 +87,112 @@
             });
         },
         
+        displayConversation: function(widgetId, $widgetElement) {
+            const history = aiAssistantEditor.conversationHistory[widgetId];
+            let chatLogHTML = '';
+
+            history.forEach(turn => {
+                let contentHTML = $('<div/>').text(turn.parts[0].text).html();
+                chatLogHTML += `<div class="eai-chat-turn ${turn.role}"><div class="role">${turn.role === 'user' ? 'Anda' : 'AI Assistant'}</div><div class="content">${contentHTML}</div></div>`;
+            });
+            
+            const fullHTML = `
+                <div class="eai-chat-container">
+                    <div class="eai-chat-log">${chatLogHTML}</div>
+                    <button class="eai-view-copy-button" data-widget-id="${widgetId}">Lihat & Salin Respons Terakhir</button>
+                    <form class="eai-follow-up-form" data-widget-id="${widgetId}">
+                        <input type="text" class="eai-follow-up-input" placeholder="Ketik prompt tambahan...">
+                        <button type="submit" class="eai-follow-up-submit">Kirim</button>
+                    </form>
+                </div>
+            `;
+            
+            $widgetElement.find('.eai-generator-widget-wrapper').html(fullHTML);
+            const chatLog = $widgetElement.find('.eai-chat-log')[0];
+            if(chatLog) { chatLog.scrollTop = chatLog.scrollHeight; }
+        },
+
+        openModal: function(event) {
+            const widgetId = $(event.currentTarget).data('widget-id');
+            const history = aiAssistantEditor.conversationHistory[widgetId];
+            const lastAIResponse = history.filter(turn => turn.role === 'model').pop();
+            
+            if (!lastAIResponse) return;
+            const fullResponseText = lastAIResponse.parts[0].text;
+
+            $('.eai-modal-overlay').remove(); // Hapus modal lama jika ada
+            const modalHTML = `
+                <div class="eai-modal-overlay">
+                    <div class="eai-modal-content">
+                        <div class="eai-modal-header">
+                            <h4>AI Generated Response</h4>
+                            <button type="button" class="eai-modal-close">&times;</button>
+                        </div>
+                        <div class="eai-modal-body">
+                            <pre>${fullResponseText}</pre>
+                        </div>
+                        <div class="eai-modal-footer">
+                            <button type="button" class="eai-modal-copy-all">Salin Semua</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('body').append(modalHTML);
+        },
+
+        closeModal: function() {
+            $('.eai-modal-overlay').remove();
+        },
+
+        handleModalCopyClick: function(event) {
+            const $button = $(event.currentTarget);
+            // Ambil teks dari elemen <pre> di dalam modal yang sama
+            const textToCopy = $button.closest('.eai-modal-content').find('.eai-modal-body pre').text();
+
+            if (textToCopy && navigator.clipboard) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    $button.text('Tersalin!').addClass('copied');
+                    setTimeout(() => { $button.text('Salin Semua').removeClass('copied'); }, 2000);
+                });
+            }
+        },
+
+        getWidgetElement: function(widgetId) { const $previewIframe = $('#elementor-preview-iframe').contents(); return $previewIframe.find(`[data-id="${widgetId}"]`); },
         isPromptValid: function (prompt) { return prompt && prompt.trim() !== ''; },
         setLoadingState: function ($widgetElement, isLoading) {
             const $wrapper = $widgetElement.find('.eai-generator-widget-wrapper');
-            if (isLoading) { $wrapper.html('<h3><span class="eicon-loading eicon-animation-spin"></span> Generating...</h3>'); }
-        },
-        displayResult: function ($widgetElement, result) {
-            const $wrapper = $widgetElement.find('.eai-generator-widget-wrapper');
-            const resultHTML = `<div class="eai-response-wrapper"><button class="eai-copy-button">Salin Teks</button><h4>AI Response:</h4><pre>${result}</pre></div>`;
-            $wrapper.html(resultHTML);
-        },
-        displayError: function ($widgetElement, message) {
-            const $wrapper = $widgetElement.find('.eai-generator-widget-wrapper');
-            $wrapper.html(`<p style="color: red;"><b>Error:</b> ${message}</p>`);
-        },
-        showNotification: function (type, message) {
-            if (typeof elementor.notifications !== 'undefined') {
-                elementor.notifications.showToast({ message: message });
+            if (isLoading) {
+                if ($wrapper.find('.eai-chat-container').length) {
+                    $wrapper.find('.eai-follow-up-form').hide();
+                    $wrapper.find('.eai-chat-log').append('<p class="eai-thinking" style="text-align:center; opacity:0.7;"><i>AI is thinking...</i></p>');
+                } else {
+                    $wrapper.html('<h3><span class="eicon-loading eicon-animation-spin"></span> Generating...</h3>');
+                }
             }
         },
+        displayError: function ($widgetElement, message) { $widgetElement.find('.eai-generator-widget-wrapper').html(`<p style="color: red;"><b>Error:</b> ${message}</p>`); },
+        showNotification: function (type, message) { if (typeof elementor.notifications !== 'undefined') { elementor.notifications.showToast({ message: message }); } },
     };
 
-    $(window).on('elementor:init', () => aiAssistantEditor.init());
+    // --- PERBAIKAN UTAMA DI SINI ---
+    // Kita pindahkan listener untuk modal ke sini, di dokumen utama.
+    $(function() {
+        aiAssistantEditor.init();
+
+        // Event listener ini sekarang berada di lingkup yang benar.
+        $('body').on('click', '.eai-modal-close, .eai-modal-overlay', function(e) {
+            // Pastikan tidak menutup jika mengklik konten modalnya
+            if ($(e.target).is('.eai-modal-content') || $(e.target).closest('.eai-modal-content').length > 0) {
+                if (!$(e.target).is('.eai-modal-close')) {
+                    return;
+                }
+            }
+            aiAssistantEditor.closeModal();
+        });
+
+        $('body').on('click', '.eai-modal-copy-all', function(e) {
+            aiAssistantEditor.handleModalCopyClick(e);
+        });
+    });
 
 })(jQuery);

@@ -1,0 +1,41 @@
+/**
+ * Styling untuk Halaman Pengaturan AI Assistant (dengan Tab)
+ */
+
+/* Pembungkus utama untuk navigasi tab */
+.eai-nav-tab-wrapper {
+    margin-bottom: 25px;
+}
+
+/* Gaya untuk setiap tab */
+.eai-nav-tab-wrapper .nav-tab {
+    padding: 9px 15px;
+    margin: 0; /* Hapus margin antar tab, biarkan border yang memisahkan */
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-bottom: 1px solid #ccc; /* Border bawah terlihat saat tidak aktif */
+    text-decoration: none;
+    font-size: 14px;
+}
+
+/* Gaya untuk tab yang sedang aktif */
+.eai-nav-tab-wrapper .nav-tab-active,
+.eai-nav-tab-wrapper .nav-tab-active:hover {
+    background: #fdfdfd; /* Warna latar belakang halaman */
+    border-bottom: 1px solid #fdfdfd; /* Sembunyikan border bawah agar menyatu dengan konten */
+}
+
+/* Konten tab, sembunyikan secara default */
+.eai-settings-tab-content {
+    display: none;
+}
+
+/* Tampilkan konten tab yang aktif */
+.eai-settings-tab-content.active {
+    display: block;
+}
+
+/* Beri sedikit jarak di atas tabel pengaturan */
+.eai-settings-tab-content .form-table {
+    margin-top: 10px;
+}

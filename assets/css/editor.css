@@ -1,51 +1,122 @@
 /**
- * Styling untuk AI Assistant di dalam Editor Elementor
+ * Styling untuk AI Assistant di dalam Editor Elementor (dengan Modal)
  */
-.eai-response-wrapper {
-    background-color: #f7f7f7;
-    border: 1px solid #e0e0e0;
+
+/* ... (semua style dari .eai-chat-container hingga .eai-follow-up-submit tetap sama) ... */
+.eai-chat-container { background-color: #f7f9fc; border: 1px solid #e0e4e9; border-radius: 6px; padding: 15px; margin-top: 10px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; }
+.eai-chat-log { max-height: 450px; overflow-y: auto; margin-bottom: 20px; padding-right: 10px; }
+.eai-chat-turn { margin-bottom: 15px; display: flex; flex-direction: column; }
+.eai-chat-turn .role { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #50575e; }
+.eai-chat-turn.user { align-items: flex-end; }
+.eai-chat-turn.user .content { background-color: #dbeafe; padding: 10px 15px; border-radius: 12px 12px 0 12px; color: #2c5282; max-width: 85%; }
+.eai-chat-turn.user .role { text-align: right; margin-right: 5px; }
+.eai-chat-turn.model { align-items: flex-start; }
+.eai-chat-turn.model .content { background-color: #ffffff; padding: 10px 15px; border-radius: 12px 12px 12px 0; border: 1px solid #e0e4e9; max-width: 95%; position: relative; }
+.eai-chat-turn.model .content ul { padding-left: 20px; margin: 5px 0; }
+.eai-chat-turn.model .content li { margin-bottom: 5px; line-height: 1.6; }
+.eai-follow-up-form { display: flex; gap: 10px; border-top: 1px solid #e0e4e9; padding-top: 15px; }
+.eai-follow-up-input { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }
+.eai-follow-up-submit { padding: 8px 15px; background-color: #3258e8; color: white; border: none; border-radius: 3px; cursor: pointer; }
+.eai-follow-up-submit:hover { background-color: #2748c2; }
+
+
+/* --- STYLE BARU UNTUK MODAL --- */
+
+/* Tombol untuk membuka modal */
+.eai-view-copy-button {
+    background-color: #3258e8;
+    color: white;
+    border: none;
+    padding: 8px 15px;
     border-radius: 4px;
-    padding: 15px;
-    margin-top: 10px;
-    position: relative;
+    cursor: pointer;
+    font-size: 13px;
+}
+.eai-view-copy-button:hover {
+    background-color: #2748c2;
 }
 
-.eai-response-wrapper h4 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 14px;
-    color: #333;
+/* Lapisan latar belakang gelap di belakang modal */
+.eai-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 99998; /* Di bawah modal, di atas segalanya */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.eai-response-wrapper pre {
+/* Kotak modal itu sendiri */
+.eai-modal-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+/* Header modal */
+.eai-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e5e5e5;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.eai-modal-header h4 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.eai-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 5px;
+}
+
+/* Area body modal yang bisa di-scroll */
+.eai-modal-body {
+    overflow-y: auto;
+    line-height: 1.7;
+    /* Memastikan teks bisa dipilih */
+    user-select: text; 
+}
+.eai-modal-body pre {
     white-space: pre-wrap;
     word-wrap: break-word;
-    margin: 0;
-    padding: 0;
-    background-color: transparent;
-    border: none;
-    font-size: 13px;
-    color: #555;
+    font-size: 14px;
 }
 
-.eai-copy-button {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: #556068;
-    color: #fff;
+/* Footer modal */
+.eai-modal-footer {
+    border-top: 1px solid #e5e5e5;
+    padding-top: 15px;
+    margin-top: 20px;
+    text-align: right;
+}
+
+.eai-modal-copy-all {
+    background-color: #4CAF50;
+    color: white;
     border: none;
-    border-radius: 3px;
-    padding: 5px 10px;
-    font-size: 11px;
+    padding: 10px 18px;
+    border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    font-size: 13px;
 }
-
-.eai-copy-button:hover {
-    background-color: #40484d;
-}
-
-.eai-copy-button.copied {
-    background-color: #4CAF50; /* Warna hijau saat berhasil disalin */
+.eai-modal-copy-all.copied {
+    background-color: #3e8e41;
 }
